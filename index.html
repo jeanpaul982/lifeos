@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LIFEOS - Mi Sistema Operativo Personal</title>
+  <meta name="description" content="LIFEOS: Tu sistema operativo personal para organizar Estudios, Gym, Deporte, Hábitos, Objetivos, Proyectos y Startup." />
+
+  <!-- Estilos SaaS Dark Mode -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div id="app-root">
+    <!-- SIDEBAR DE NAVEGACIÓN PRINCIPAL -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="#" class="brand-logo">
+          <div class="brand-icon">⚡</div>
+          <span>LIFEOS</span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-view="goals">
+          <span class="nav-icon">🎯</span>
+          <span>Objetivos</span>
+        </a>
+        <a href="#" class="nav-item" data-view="tasks">
+          <span class="nav-icon">✅</span>
+          <span>Tareas</span>
+        </a>
+        <a href="#" class="nav-item" data-view="study">
+          <span class="nav-icon">📚</span>
+          <span>Estudios</span>
+        </a>
+        <a href="#" class="nav-item" data-view="gym">
+          <span class="nav-icon">🏋️</span>
+          <span>Gym</span>
+        </a>
+        <a href="#" class="nav-item" data-view="sports">
+          <span class="nav-icon">⚽</span>
+          <span>Deporte</span>
+        </a>
+        <a href="#" class="nav-item" data-view="habits">
+          <span class="nav-icon">🧠</span>
+          <span>Hábitos</span>
+        </a>
+        <a href="#" class="nav-item" data-view="focus">
+          <span class="nav-icon">⚡</span>
+          <span>Modo Enfoque</span>
+        </a>
+        <a href="#" class="nav-item" data-view="projects">
+          <span class="nav-icon">💻</span>
+          <span>Proyectos</span>
+        </a>
+        <a href="#" class="nav-item" data-view="startup">
+          <span class="nav-icon">🚀</span>
+          <span>Startup</span>
+        </a>
+        <a href="#" class="nav-item" data-view="stats">
+          <span class="nav-icon">📊</span>
+          <span>Estadísticas</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="user-profile-summary" class="user-profile-summary">
+          <!-- Carga dinámicamente -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL DE TRABAJO -->
+    <div class="main-wrapper">
+      <!-- TOPBAR SUPERIOR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="btn-menu-toggle" id="btn-menu-toggle">☰</button>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" placeholder="Buscar en LIFEOS..." />
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="date-badge" id="current-date-badge">LIFEOS v1.0</div>
+          <!-- Botón Global (+) Acción Rápida -->
+          <button class="btn-quick-add" id="btn-global-quick-add" title="Crear elemento rápido">+</button>
+        </div>
+      </header>
+
+      <!-- CONTENEDOR DINÁMICO DE VISTAS (SPA) -->
+      <main class="content-area" id="content-area">
+        <!-- Renderizado dinámico de JavaScript -->
+      </main>
+    </div>
+  </div>
+
+  <!-- NAVEGACIÓN BOTTOM EN MÓVILES -->
+  <div class="mobile-bottom-nav">
+    <a href="#" class="mobile-nav-item active" data-view="dashboard">
+      <span class="nav-icon">🏠</span>
+      <span>Inicio</span>
+    </a>
+    <a href="#" class="mobile-nav-item" data-view="tasks">
+      <span class="nav-icon">✅</span>
+      <span>Tareas</span>
+    </a>
+    <a href="#" class="mobile-nav-item" data-view="goals">
+      <span class="nav-icon">🎯</span>
+      <span>Metas</span>
+    </a>
+    <a href="#" class="mobile-nav-item" data-view="habits">
+      <span class="nav-icon">🧠</span>
+      <span>Hábitos</span>
+    </a>
+    <a href="#" class="mobile-nav-item" data-view="stats">
+      <span class="nav-icon">📊</span>
+      <span>Stats</span>
+    </a>
+  </div>
+
+  <!-- MODAL DE AUTENTICACIÓN (LOGIN, REGISTRO, RECUPERACIÓN) -->
+  <div id="auth-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 440px;">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div class="brand-icon" style="margin: 0 auto 0.75rem auto; width: 44px; height: 44px; font-size: 1.4rem;">⚡</div>
+        <h2 style="font-family: var(--font-heading); font-size: 1.5rem;">Bienvenido a LIFEOS</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">Tu sistema personal de productividad y control</p>
+      </div>
+
+      <!-- Selector Login / Registro -->
+      <div style="display: flex; background: var(--bg-card); border-radius: var(--radius-md); padding: 0.25rem; margin-bottom: 1.5rem;">
+        <button id="tab-auth-login" class="btn btn-primary" style="flex: 1; border-radius: var(--radius-sm);">Iniciar Sesión</button>
+        <button id="tab-auth-register" class="btn btn-secondary" style="flex: 1; border-radius: var(--radius-sm);">Registrarse</button>
+      </div>
+
+      <!-- Formulario Login -->
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="auth-email" class="form-control" placeholder="tu@email.com" required value="demo@lifeos.app" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="auth-password" class="form-control" placeholder="••••••••" required value="password123" />
+        </div>
+        <div style="text-align: right; margin-bottom: 1rem;">
+          <a href="#" id="link-auth-recover" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none;">¿Olvidaste tu contraseña?</a>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Entrar a LIFEOS</button>
+      </form>
+
+      <!-- Formulario Registro -->
+      <form id="register-form" style="display: none;">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo</label>
+          <input type="text" id="reg-name" class="form-control" placeholder="Tu Nombre" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="reg-email" class="form-control" placeholder="tu@email.com" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="reg-password" class="form-control" placeholder="Mínimo 6 caracteres" required />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Crear mi Cuenta LIFEOS</button>
+      </form>
+
+      <!-- Formulario Recuperar Contraseña -->
+      <form id="recover-form" style="display: none;">
+        <div class="form-group">
+          <label class="form-label">Correo Registrado</label>
+          <input type="email" id="recover-email" class="form-control" placeholder="tu@email.com" required />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; margin-bottom: 0.75rem;">Enviar Instrucciones</button>
+        <div style="text-align: center;">
+          <a href="#" id="link-back-login" style="color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">Volver al Login</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Carga limpia de Script universal -->
+  <script src="js/app.js"></script>
+</body>
+</html>
