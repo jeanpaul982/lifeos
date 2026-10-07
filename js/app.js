@@ -2624,12 +2624,18 @@ function renderUserUI(user) {
         <div class="empty-state" style="margin-top: 3rem;">
           <div class="empty-state-icon">🔒</div>
           <h2>Acceso Requerido a LIFEOS</h2>
-          <p>Por favor inicia sesión o crea tu cuenta para acceder a tus datos privados.</p>
-          <button id="btn-login-hero" class="btn btn-primary" style="margin-top: 1rem;">🔑 Abrir Login / Registro</button>
+          <p>Por favor inicia sesión o crea tu cuenta para guardar en la nube con Supabase, o entra como invitado.</p>
+          <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+            <button id="btn-login-hero" class="btn btn-primary">🔑 Abrir Login / Registro</button>
+            <button id="btn-demo-hero" class="btn btn-secondary">🚀 Entrar como Invitado (Modo Demo)</button>
+          </div>
         </div>
       `;
       contentArea.querySelector('#btn-login-hero')?.addEventListener('click', () => {
         authModal?.classList.add('active');
+      });
+      contentArea.querySelector('#btn-demo-hero')?.addEventListener('click', () => {
+        document.getElementById('btn-demo-mode')?.click();
       });
     }
   }
@@ -2747,9 +2753,16 @@ function initAuthModalEvents() {
     recoverForm.style.display = 'block';
   });
 
-  linkBackLogin?.addEventListener('click', (e) => {
-    e.preventDefault();
-    tabLogin.click();
+  document.getElementById('btn-demo-mode')?.addEventListener('click', () => {
+    currentUser = {
+      id: 'demo_user_1',
+      email: 'usuario.demo@lifeos.app',
+      user_metadata: { full_name: 'Usuario Demo' }
+    };
+    localStorage.setItem('lifeos_active_user', JSON.stringify(currentUser));
+    showToast('¡Bienvenido a LIFEOS en Modo Demo! 🚀', 'success');
+    authModal?.classList.remove('active');
+    renderUserUI(currentUser);
   });
 
   loginForm?.addEventListener('submit', async (e) => {
