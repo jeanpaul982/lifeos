@@ -52,6 +52,20 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 );
 
 -- ------------------------------------------
+-- 3b. CALENDAR EVENTS TABLE
+-- ------------------------------------------
+CREATE TABLE IF NOT EXISTS public.calendar_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    date DATE NOT NULL,
+    time TIME,
+    category TEXT CHECK (category IN ('Estudios', 'Gym', 'Deporte', 'Hábitos', 'Proyectos', 'Startup', 'Personal')) DEFAULT 'Personal',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------
 -- 4. HABITS & HABIT LOGS
 -- ------------------------------------------
 CREATE TABLE IF NOT EXISTS public.habits (
@@ -233,6 +247,8 @@ CREATE TABLE IF NOT EXISTS public.startup_tasks (
 -- INDEXES FOR PERFORMANCE
 -- ------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON public.tasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_user_id ON public.calendar_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON public.calendar_events(date);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON public.goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_habits_user_id ON public.habits(user_id);
 CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON public.habit_logs(date);
@@ -246,6 +262,7 @@ CREATE INDEX IF NOT EXISTS idx_startup_members_workspace ON public.startup_membe
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.habits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.habit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.focus_sessions ENABLE ROW LEVEL SECURITY;
@@ -267,6 +284,7 @@ ALTER TABLE public.startup_tasks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users access own profile" ON public.profiles FOR ALL USING (auth.uid() = id);
 CREATE POLICY "Users access own goals" ON public.goals FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users access own tasks" ON public.tasks FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users access own calendar_events" ON public.calendar_events FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users access own habits" ON public.habits FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users access own habit_logs" ON public.habit_logs FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users access own focus_sessions" ON public.focus_sessions FOR ALL USING (auth.uid() = user_id);

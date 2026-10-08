@@ -93,7 +93,7 @@ class LocalDatabase {
   }
 
   exportBackupJSON() {
-    const tables = ['tasks', 'goals', 'habits', 'habit_logs', 'focus_sessions', 'study_courses', 'study_topics', 'study_sessions', 'workouts', 'workout_exercises', 'sports_sessions', 'projects', 'project_tasks', 'startup_workspaces', 'startup_members', 'startup_roadmap', 'startup_products', 'startup_tasks'];
+    const tables = ['tasks', 'goals', 'habits', 'habit_logs', 'focus_sessions', 'study_courses', 'study_topics', 'study_sessions', 'workouts', 'workout_exercises', 'sports_sessions', 'projects', 'project_tasks', 'startup_workspaces', 'startup_members', 'startup_roadmap', 'startup_products', 'startup_tasks', 'calendar_events'];
     const backup = {};
     tables.forEach(t => backup[t] = this.get(t));
     return JSON.stringify(backup, null, 2);
@@ -2497,6 +2497,266 @@ async function renderStats(container) {
 }
 
 // --------------------------------------------------------------------------
+// 15b. CALENDAR MODULE (FULL MONTH VIEW + EVENTS CRUD)
+// --------------------------------------------------------------------------
+let calendarCursor = new Date();
+let calendarSelectedDate = null;
+
+async function renderCalendar(container) {
+  const user = getCurrentUser();
+  let events = [];
+
+  if (supabaseClient && user) {
+    const { data } = await supabaseClient.from('calendar_events').select('*').eq('user_id', user.id);
+    events = data || [];
+  } else {
+    events = localDb.get('calendar_events');
+  }
+
+  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const weekdayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+
+  const eventsByDate = {};
+  events.forEach(ev => {
+    if (!eventsByDate[ev.date]) eventsByDate[ev.date] = [];
+    eventsByDate[ev.date].push(ev);
+  });
+  Object.values(eventsByDate).forEach(list => list.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')));
+
+  let cellsHtml = '';
+  for (let i = 0; i < firstWeekday; i++) cellsHtml += `<div class="cal-cell cal-cell-empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dayEvents = eventsByDate[dateStr] || [];
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === calendarSelectedDate;
+    cellsHtml += `
+      <div class="cal-cell ${isToday ? 'cal-cell-today' : ''} ${isSelected ? 'cal-cell-selected' : ''}" data-date="${dateStr}">
+        <div class="cal-cell-day">${d}</div>
+        <div class="cal-cell-events">
+          ${dayEvents.slice(0, 3).map(ev => `
+            <div class="cal-chip" title="${escapeHtml(ev.title)}${ev.time ? ' · ' + ev.time : ''}">
+              ${ev.time ? `<span>${escapeHtml(ev.time)}</span>` : ''}${escapeHtml(ev.title)}
+            </div>
+          `).join('')}
+          ${dayEvents.length > 3 ? `<div class="cal-more">+${dayEvents.length - 3} más</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  const selectedDateEvents = calendarSelectedDate ? (eventsByDate[calendarSelectedDate] || []) : [];
+
+  container.innerHTML = `
+    <div class="page-header">
+      <div class="page-title-group">
+        <h1>📅 Calendario de Actividades</h1>
+        <p>Anota todo lo que harás: eventos, citas y planes de cada día.</p>
+      </div>
+      <button id="btn-open-calendar-event" class="btn btn-primary">+ Nuevo Evento</button>
+    </div>
+
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-sm" id="btn-cal-prev" title="Mes anterior">←</button>
+          <button class="btn btn-secondary btn-sm" id="btn-cal-today">Hoy</button>
+          <button class="btn btn-secondary btn-sm" id="btn-cal-next" title="Mes siguiente">→</button>
+        </div>
+        <h3 style="font-size: 1.15rem; font-family: var(--font-heading);">${monthNames[month]} ${year}</h3>
+      </div>
+
+      <div class="cal-weekdays">
+        ${weekdayLabels.map(w => `<div class="cal-weekday">${w}</div>`).join('')}
+      </div>
+      <div class="cal-grid">
+        ${cellsHtml}
+      </div>
+    </div>
+
+    <div class="card" id="cal-day-panel" style="margin-top: 1.5rem; ${calendarSelectedDate ? '' : 'display:none;'}" data-date="${calendarSelectedDate || ''}">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 0.5rem; flex-wrap: wrap;">
+        <h3 style="font-size: 1.1rem; font-family: var(--font-heading);">📋 Plan del Día <span style="color: var(--text-muted);">· ${calendarSelectedDate ? formatDateSpan(calendarSelectedDate) : ''}</span></h3>
+        <button class="btn btn-primary btn-sm" id="btn-add-event-day">+ Agregar Evento</button>
+      </div>
+      <div id="cal-day-events">
+        ${selectedDateEvents.length === 0 ? `
+          <div class="empty-state" style="padding: 2rem;">
+            <div class="empty-state-icon">🗓️</div>
+            <h3>Día libre</h3>
+            <p>Haz clic en "+ Agregar Evento" para anotar algo en este día.</p>
+          </div>
+        ` : selectedDateEvents.map(ev => `
+          <div class="cal-day-event">
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="badge badge-medium">${ev.time || 'Todo el día'}</span>
+                <span class="badge" style="background: var(--bg-tertiary); color: var(--text-muted);">${escapeHtml(ev.category || 'Personal')}</span>
+              </div>
+              <h4 style="margin-top: 0.4rem; font-size: 1rem;">${escapeHtml(ev.title)}</h4>
+              ${ev.description ? `<p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">${escapeHtml(ev.description)}</p>` : ''}
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn btn-secondary btn-sm btn-edit-cal-event" data-id="${ev.id}">✏️</button>
+              <button class="btn btn-danger btn-sm btn-delete-cal-event" data-id="${ev.id}">🗑️</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div id="calendar-event-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="calendar-event-modal-title">Nuevo Evento</h3>
+          <button class="btn-close-modal" id="btn-close-calendar-event-modal">&times;</button>
+        </div>
+        <form id="calendar-event-form">
+          <input type="hidden" id="calendar-event-id" />
+          <div class="form-group">
+            <label class="form-label">Título *</label>
+            <input type="text" id="calendar-event-title" class="form-control" placeholder="Ej: Reunión, Clase, Cita médica..." required />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Fecha *</label>
+              <input type="date" id="calendar-event-date" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Hora</label>
+              <input type="time" id="calendar-event-time" class="form-control" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoría</label>
+            <select id="calendar-event-category" class="form-control">
+              ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descripción / Notas</label>
+            <textarea id="calendar-event-description" class="form-control" placeholder="Detalles de lo que harás..."></textarea>
+          </div>
+          <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-calendar-event">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Evento</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  container.querySelector('#btn-cal-prev').addEventListener('click', () => {
+    calendarCursor = new Date(year, month - 1, 1);
+    renderCalendar(container);
+  });
+  container.querySelector('#btn-cal-next').addEventListener('click', () => {
+    calendarCursor = new Date(year, month + 1, 1);
+    renderCalendar(container);
+  });
+  container.querySelector('#btn-cal-today').addEventListener('click', () => {
+    calendarCursor = new Date();
+    calendarSelectedDate = null;
+    renderCalendar(container);
+  });
+
+  container.querySelectorAll('.cal-cell:not(.cal-cell-empty)').forEach(cell => {
+    cell.addEventListener('click', () => {
+      calendarSelectedDate = cell.dataset.date;
+      renderCalendar(container);
+    });
+  });
+
+  const modal = container.querySelector('#calendar-event-modal');
+  const closeBtn = container.querySelector('#btn-close-calendar-event-modal');
+  const cancelBtn = container.querySelector('#btn-cancel-calendar-event');
+  const form = container.querySelector('#calendar-event-form');
+
+  function openModalForDate(date) {
+    container.querySelector('#calendar-event-id').value = '';
+    container.querySelector('#calendar-event-title').value = '';
+    container.querySelector('#calendar-event-date').value = date;
+    container.querySelector('#calendar-event-time').value = '';
+    container.querySelector('#calendar-event-category').value = 'Personal';
+    container.querySelector('#calendar-event-description').value = '';
+    container.querySelector('#calendar-event-modal-title').textContent = 'Nuevo Evento';
+    modal.classList.add('active');
+  }
+
+  container.querySelector('#btn-open-calendar-event').addEventListener('click', () => openModalForDate(calendarSelectedDate || todayStr));
+  container.querySelector('#btn-add-event-day').addEventListener('click', () => openModalForDate(calendarSelectedDate || todayStr));
+
+  closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+  cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = container.querySelector('#calendar-event-id').value;
+    const eventData = {
+      title: container.querySelector('#calendar-event-title').value.trim(),
+      date: container.querySelector('#calendar-event-date').value,
+      time: container.querySelector('#calendar-event-time').value || null,
+      category: container.querySelector('#calendar-event-category').value,
+      description: container.querySelector('#calendar-event-description').value.trim(),
+      user_id: user?.id
+    };
+
+    try {
+      if (id) {
+        if (supabaseClient && user) await supabaseClient.from('calendar_events').update(eventData).eq('id', id);
+        else localDb.update('calendar_events', id, eventData);
+        showToast('Evento actualizado', 'success');
+      } else {
+        if (supabaseClient && user) await supabaseClient.from('calendar_events').insert([eventData]);
+        else localDb.insert('calendar_events', eventData);
+        showToast('Evento agregado al calendario 📅', 'success');
+      }
+      modal.classList.remove('active');
+      renderCalendar(container);
+    } catch (err) {
+      showToast(err.message || 'Error al guardar el evento', 'error');
+    }
+  });
+
+  container.querySelectorAll('.btn-edit-cal-event').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ev = events.find(x => x.id === btn.dataset.id);
+      if (!ev) return;
+      container.querySelector('#calendar-event-id').value = ev.id;
+      container.querySelector('#calendar-event-title').value = ev.title || '';
+      container.querySelector('#calendar-event-date').value = ev.date || '';
+      container.querySelector('#calendar-event-time').value = ev.time || '';
+      container.querySelector('#calendar-event-category').value = ev.category || 'Personal';
+      container.querySelector('#calendar-event-description').value = ev.description || '';
+      container.querySelector('#calendar-event-modal-title').textContent = 'Editar Evento';
+      modal.classList.add('active');
+    });
+  });
+
+  container.querySelectorAll('.btn-delete-cal-event').forEach(btn => {
+    btn.addEventListener('click', () => {
+      confirmAction('Eliminar Evento', '¿Eliminar este evento del calendario?', async () => {
+        if (supabaseClient && user) await supabaseClient.from('calendar_events').delete().eq('id', btn.dataset.id);
+        else localDb.delete('calendar_events', btn.dataset.id);
+        showToast('Evento eliminado', 'info');
+        renderCalendar(container);
+      });
+    });
+  });
+}
+
+function formatDateSpan(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// --------------------------------------------------------------------------
 // 16. QUICK ACTION MODAL (+ BUTTON)
 // --------------------------------------------------------------------------
 function initQuickActionModal() {
@@ -2514,6 +2774,9 @@ function initQuickActionModal() {
       <div style="display: flex; flex-direction: column; gap: 0.65rem;">
         <button class="btn btn-secondary btn-quick-target" data-view="tasks" style="justify-content: flex-start; padding: 0.8rem 1rem;">
           <span style="font-size: 1.2rem;">✅</span> Nueva Tarea
+        </button>
+        <button class="btn btn-secondary btn-quick-target" data-view="calendar" style="justify-content: flex-start; padding: 0.8rem 1rem;">
+          <span style="font-size: 1.2rem;">📅</span> Nuevo Evento en Calendario
         </button>
         <button class="btn btn-secondary btn-quick-target" data-view="goals" style="justify-content: flex-start; padding: 0.8rem 1rem;">
           <span style="font-size: 1.2rem;">🎯</span> Nuevo Objetivo
@@ -2550,7 +2813,7 @@ function initQuickActionModal() {
       if (navBtn) navBtn.click();
 
       setTimeout(() => {
-        const createBtn = document.querySelector('#btn-open-task-modal, #btn-open-goal-modal, #btn-open-habit-modal, #btn-open-course-modal, #btn-open-workout-modal, #btn-open-sport-modal, #btn-open-project-modal');
+        const createBtn = document.querySelector('#btn-open-task-modal, #btn-open-goal-modal, #btn-open-habit-modal, #btn-open-course-modal, #btn-open-workout-modal, #btn-open-sport-modal, #btn-open-project-modal, #btn-open-calendar-event');
         createBtn?.click();
       }, 200);
     });
@@ -2681,6 +2944,7 @@ function navigateTo(view) {
     case 'dashboard': renderDashboard(contentArea); break;
     case 'goals': renderGoals(contentArea); break;
     case 'tasks': renderTasks(contentArea); break;
+    case 'calendar': renderCalendar(contentArea); break;
     case 'study': renderStudy(contentArea); break;
     case 'gym': renderGym(contentArea); break;
     case 'sports': renderSports(contentArea); break;
